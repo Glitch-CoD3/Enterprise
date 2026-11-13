@@ -1,0 +1,36 @@
+.env
+.env.local
+supabase_schema.sql
+supabase_admin_dashboard.sql
+supabase_checkout.sql
+supabase_storage.sql
+supabase_store_pricing.sql
+supabase_brand_categories.sql
+README.md
+supabase_order_stock_reservations.sql
+supabase_customer_queries.sql
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
