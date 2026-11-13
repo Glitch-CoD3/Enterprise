@@ -1,52 +1,558 @@
+import { useEffect, useState } from 'react'
 import './App.css'
+import Admin from './Admin.jsx'
+import {
+  fetchPortfolio,
+  fetchPortfolioInquiry,
+  fetchPortfolioViewCount,
+  recordPortfolioView,
+  submitPortfolioInquiry,
+} from './lib/supabase.js'
 
-import Skills from './componants/Skills';
-import Sidebar from './componants/Sidebar';
-import Navigation from './componants/Navigation';
-import About from './componants/About';
-import Education from './componants/Education';
-import Portfolio from './componants/Portfolio';
+const inquiryTokenKey = 'portfolio-inquiry-token'
 
-function App() {
-  return (
-    <>
-
-
-      <div className="main-container">
-
-
-        <div className="Sidebar">
-          <Sidebar />
-        </div>
-
-        {/* content-baar */}
-        <div className="content-bar">
-          <div className='nav-bar'>
-            <Navigation />
-          </div>
-
-          <div className='content-body'>
-            <About />
-
-            <Skills />
-
-            <Education />
-   
-            <Portfolio />
-
-          </div>
-
-
-
-        </div>
-
-
-      </div>
-
-
-    </>
-  );
+function readStorage(key) {
+  try {
+    return window.localStorage.getItem(key) || ''
+  } catch (storageError) {
+    console.error(`Could not read ${key} from local storage:`, storageError)
+    return ''
+  }
 }
 
-export default App;
+function createInquiryToken() {
+  const bytes = window.crypto.getRandomValues(new Uint8Array(32))
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+}
 
+function getWhatsAppUrl(phone, location) {
+  let number = phone.replace(/\D/g, '')
+  if (!number) return ''
+  if (number.startsWith('00')) {
+    number = number.slice(2)
+  } else if (number.startsWith('0') && /bangladesh/i.test(location)) {
+    number = `880${number.slice(1)}`
+  }
+  return `https://wa.me/${number}`
+}
+
+function getInquiryErrorMessage(error, fallback) {
+  const message = error.message || fallback
+  if (/schema cache|function .*does not exist|could not find the function/i.test(message)) {
+    return `${message} Apply 20261114030000_portfolio_inquiries.sql in Supabase to enable questions.`
+  }
+  return message
+}
+
+function renderInlineMarkdown(text) {
+  return text.split(/(\*\*[^*]+\*\*|!\[[^\]]*\]\(https?:\/\/[^)\s]+\))/g).map((part, index) => {
+    const strongMatch = part.match(/^\*\*([^*]+)\*\*$/)
+    if (strongMatch) return <strong key={index}>{strongMatch[1]}</strong>
+
+    const imageMatch = part.match(/^!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)$/)
+    if (imageMatch) {
+      return <img className="about-markdown-image" key={index} src={imageMatch[2]} alt={imageMatch[1]} loading="lazy" decoding="async" />
+    }
+
+    return part
+  })
+}
+
+function getSkillImage(value) {
+  const imageValue = String(value || '').trim()
+  const markdownMatch = imageValue.match(/^!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)$/)
+  return {
+    url: markdownMatch ? markdownMatch[2] : imageValue,
+    alt: markdownMatch?.[1] || '',
+  }
+}
+
+function isShieldsBadge(url) {
+  return /^https?:\/\/img\.shields\.io\//i.test(url)
+}
+
+function groupSkillsByCategory(skills) {
+  const groups = []
+  for (const skill of skills) {
+    let group = groups[groups.length - 1]
+    if (!group || group.category !== skill.category) {
+      group = { category: skill.category, skills: [] }
+      groups.push(group)
+    }
+    group.skills.push(skill)
+  }
+  return groups
+}
+
+function SkillBadge({ skill }) {
+  const icon = getSkillImage(skill.icon_url)
+  const badge = isShieldsBadge(icon.url)
+
+  return (
+    <div className={`skill-row${badge ? ' skill-row-badge' : ''}`}>
+      {icon.url
+        ? <img className={badge ? 'skill-badge-image' : 'skill-icon'} src={icon.url} alt={badge ? icon.alt || skill.name : ''} loading="lazy" decoding="async" />
+        : <span className="skill-icon-placeholder" aria-hidden="true">{skill.name.slice(0, 2).toUpperCase()}</span>}
+      {!badge && <span className="skill-name">{skill.name}</span>}
+    </div>
+  )
+}
+
+function formatAboutContent(content) {
+  const blocks = []
+  let heading = ''
+  let paragraph = []
+  let listItems = []
+
+  function flushParagraph() {
+    if (paragraph.length) blocks.push({ type: 'paragraph', text: paragraph.join(' ') })
+    paragraph = []
+  }
+
+  function flushList() {
+    if (listItems.length) blocks.push({ type: 'list', items: listItems })
+    listItems = []
+  }
+
+  for (const rawLine of String(content || '').split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line) {
+      flushParagraph()
+      flushList()
+      continue
+    }
+
+    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/)
+    if (headingMatch) {
+      flushParagraph()
+      flushList()
+      if (!heading) {
+        heading = headingMatch[2]
+      } else {
+        blocks.push({ type: 'heading', text: headingMatch[2] })
+      }
+      continue
+    }
+
+    const bulletMatch = line.match(/^[-*•]\s+(.+)$/)
+    if (bulletMatch || /^\p{Extended_Pictographic}/u.test(line)) {
+      flushParagraph()
+      listItems.push(bulletMatch ? bulletMatch[1] : line)
+      continue
+    }
+
+    flushList()
+    paragraph.push(line)
+  }
+
+  flushParagraph()
+  flushList()
+  return { heading, blocks }
+}
+
+function PortfolioSite() {
+  const [portfolio, setPortfolio] = useState(null)
+  const [publicViewCount, setPublicViewCount] = useState(null)
+  const [error, setError] = useState('')
+  const [ticketToken, setTicketToken] = useState(() => readStorage(inquiryTokenKey))
+  const [inquiryRefresh, setInquiryRefresh] = useState(0)
+  const [inquiry, setInquiry] = useState(null)
+  const [inquiryLoading, setInquiryLoading] = useState(() => Boolean(readStorage(inquiryTokenKey)))
+  const [inquiryBusy, setInquiryBusy] = useState(false)
+  const [inquiryError, setInquiryError] = useState('')
+  const [inquiryNotice, setInquiryNotice] = useState('')
+  const [questionName, setQuestionName] = useState('')
+  const [questionEmail, setQuestionEmail] = useState('')
+  const [questionBody, setQuestionBody] = useState('')
+  const [ticketLookup, setTicketLookup] = useState('')
+
+  useEffect(() => {
+    let active = true
+    fetchPortfolio()
+      .then((data) => {
+        if (active) setPortfolio(data)
+      })
+      .catch((loadError) => {
+        if (active) setError(loadError.message || 'Could not load portfolio content.')
+      })
+
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    async function updateViewCount() {
+      try {
+        await recordPortfolioView()
+      } catch (viewError) {
+        if (active) console.error('Could not record portfolio page view:', viewError)
+      }
+
+      try {
+        const viewCount = await fetchPortfolioViewCount()
+        if (active) setPublicViewCount(viewCount)
+      } catch (countError) {
+        if (active) console.error('Could not load portfolio page view count:', countError)
+      }
+    }
+
+    updateViewCount()
+
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    if (portfolio?.settings?.site_title) {
+      document.title = `${portfolio.settings.site_title} | Portfolio`
+    }
+    if (portfolio?.profile?.about) {
+      document.querySelector('meta[name="description"]')?.setAttribute('content', portfolio.profile.about)
+    }
+  }, [portfolio?.settings?.site_title, portfolio?.profile?.about])
+
+  useEffect(() => {
+    if (!ticketToken) {
+      setInquiry(null)
+      setInquiryLoading(false)
+      return undefined
+    }
+
+    let active = true
+    async function refreshInquiry() {
+      setInquiryLoading(true)
+      try {
+        const result = await fetchPortfolioInquiry(ticketToken)
+        if (!active) return
+        if (!result) {
+          setInquiry(null)
+          setTicketToken('')
+          setInquiryNotice('This question ticket has expired or is no longer available.')
+          try {
+            window.localStorage.removeItem(inquiryTokenKey)
+          } catch (storageError) {
+            console.error('Could not clear expired inquiry ticket:', storageError)
+          }
+          return
+        }
+        setInquiry(result)
+        setInquiryError('')
+      } catch (loadError) {
+        if (active) setInquiryError(getInquiryErrorMessage(loadError, 'Could not load your question ticket.'))
+      } finally {
+        if (active) setInquiryLoading(false)
+      }
+    }
+
+    refreshInquiry()
+    const refreshTimer = window.setInterval(refreshInquiry, 30000)
+    return () => {
+      active = false
+      window.clearInterval(refreshTimer)
+    }
+  }, [ticketToken, inquiryRefresh])
+
+  async function sendQuestion(event) {
+    event.preventDefault()
+    setInquiryBusy(true)
+    setInquiryError('')
+    setInquiryNotice('')
+    try {
+      const accessToken = createInquiryToken()
+      await submitPortfolioInquiry({
+        name: questionName,
+        email: questionEmail,
+        body: questionBody,
+        accessToken,
+      })
+      setInquiryLoading(true)
+      setTicketToken(accessToken)
+      try {
+        window.localStorage.setItem(inquiryTokenKey, accessToken)
+      } catch (storageError) {
+        console.error('Could not save inquiry ticket in this browser:', storageError)
+        setInquiryNotice('Your question was sent. Save the private ticket shown below to check for a reply.')
+      }
+      setQuestionBody('')
+      setInquiryNotice((notice) => notice || 'Your question was sent. Replies will appear here for 7 days.')
+    } catch (submitError) {
+      setInquiryError(getInquiryErrorMessage(submitError, 'Could not send your question.'))
+    } finally {
+      setInquiryBusy(false)
+    }
+  }
+
+  async function copyTicket() {
+    try {
+      await navigator.clipboard.writeText(ticketToken)
+      setInquiryNotice('Private ticket copied.')
+    } catch (copyError) {
+      console.error('Could not copy inquiry ticket:', copyError)
+      setInquiryNotice('Copy is unavailable. Select and copy the ticket text manually.')
+    }
+  }
+
+  function openTicket() {
+    const token = ticketLookup.trim()
+    if (!/^[A-Za-z0-9_-]{43}$/.test(token)) {
+      setInquiryError('Enter the 43-character private ticket you received.')
+      return
+    }
+
+    setInquiryError('')
+    setInquiryNotice('')
+    setInquiryLoading(true)
+    setTicketToken(token)
+    setInquiryRefresh((refresh) => refresh + 1)
+    try {
+      window.localStorage.setItem(inquiryTokenKey, token)
+    } catch (storageError) {
+      console.error('Could not save inquiry ticket in this browser:', storageError)
+    }
+  }
+
+  function startNewQuestion() {
+    setTicketToken('')
+    setInquiry(null)
+    setInquiryError('')
+    setInquiryNotice('')
+    try {
+      window.localStorage.removeItem(inquiryTokenKey)
+    } catch (storageError) {
+      console.error('Could not clear the previous inquiry ticket:', storageError)
+    }
+  }
+
+  if (error) {
+    const migrationMissing = /schema cache|does not exist|not find the table/i.test(error)
+    return (
+      <main className="setup-screen">
+        <div className="setup-card">
+          <span className="eyebrow">Portfolio setup</span>
+          <h1>{migrationMissing ? 'Set up your portfolio database' : 'Connect your portfolio database'}</h1>
+          <p>{migrationMissing
+            ? `The Supabase connection is working, but the CMS tables have not been created. Run supabase/migrations/20261114010000_portfolio_cms.sql in the Supabase SQL Editor, then refresh. Database error: ${error}`
+            : error}</p>
+          <a className="button button-primary" href="/admin">Open admin</a>
+        </div>
+      </main>
+    )
+  }
+
+  if (!portfolio) {
+    return <main className="loading-screen"><span className="loader" />Loading portfolio...</main>
+  }
+
+  const { profile, settings, skills, education, projects, socials } = portfolio
+  const aboutContent = formatAboutContent(profile.about)
+  const aboutHeading = aboutContent.heading || settings.about_heading
+  const pageStyle = { '--accent': settings.accent_color || '#3158c8' }
+  const whatsappUrl = getWhatsAppUrl(profile.phone || '', profile.location || '')
+
+  return (
+    <main className="portfolio-page" style={pageStyle}>
+      <header className="site-header">
+        <a className="wordmark" href="#home" aria-label="Home">{settings.site_title || profile.full_name}</a>
+        <nav className="site-nav" aria-label="Main navigation">
+          <a href="#about">{aboutHeading}</a>
+          <a href="#skills">{settings.skills_heading}</a>
+          <a href="#experience">{settings.education_heading}</a>
+          <a href="#work">{settings.projects_heading}</a>
+          <a href="#ask">Ask a question</a>
+        </nav>
+        <a
+          className="header-contact"
+          href={whatsappUrl || `mailto:${profile.email}`}
+          aria-label={whatsappUrl ? 'Start a WhatsApp conversation' : undefined}
+          target={whatsappUrl ? '_blank' : undefined}
+          rel={whatsappUrl ? 'noreferrer' : undefined}
+        >
+          Let&apos;s talk <span aria-hidden="true">↗</span>
+        </a>
+      </header>
+
+      <div className="portfolio-layout" id="home">
+        <aside className="profile-panel">
+          <div className="profile-image-wrap">
+            {profile.avatar_url
+              ? <img className="profile-image" src={profile.avatar_url} alt={profile.full_name} />
+              : <div className="profile-image profile-placeholder">{profile.full_name?.slice(0, 1)}</div>}
+            <span className="availability-dot" />
+          </div>
+          <p className="profile-kicker">{profile.availability || 'Available for opportunities'}</p>
+          <h1>{profile.full_name}</h1>
+          <p className="profile-role">{profile.role}</p>
+
+          <div className="profile-divider" />
+          <dl className="contact-details">
+            {profile.email && <div><dt>Email</dt><dd><a href={`mailto:${profile.email}`}>{profile.email}</a></dd></div>}
+            {profile.phone && <div><dt>Phone</dt><dd><a href={`tel:${profile.phone.replace(/[^\d+]/g, '')}`}>{profile.phone}</a></dd></div>}
+            {profile.location && <div><dt>Based in</dt><dd>{profile.location}</dd></div>}
+          </dl>
+          {socials.length > 0 && (
+            <div className="social-links">
+              {socials.map((social) => (
+                <a key={social.id} href={social.url} target="_blank" rel="noreferrer" aria-label={social.label || social.platform}>
+                  {social.label || social.platform}<span aria-hidden="true">↗</span>
+                </a>
+              ))}
+            </div>
+          )}
+          {profile.resume_url && <a className="resume-link" href={profile.resume_url} target="_blank" rel="noreferrer">View résumé <span aria-hidden="true">↗</span></a>}
+          {publicViewCount !== null && (
+            <div className="public-view-count" aria-label={`${new Intl.NumberFormat().format(publicViewCount)} profile visits`}>
+              <span>Profile visits</span>
+              <strong>{new Intl.NumberFormat().format(publicViewCount)}</strong>
+            </div>
+          )}
+        </aside>
+
+        <div className="content-panel">
+          <section className="hero-section">
+            <span className="eyebrow"><span className="eyebrow-mark" /> {settings.tagline}</span>
+            <h2>{settings.hero_title}<br /><span>{settings.hero_subtitle}</span></h2>
+            <p>{profile.role}{profile.location ? ` · Based in ${profile.location}` : ''}</p>
+            <a className="text-link" href="#work">Explore selected work <span aria-hidden="true">↓</span></a>
+          </section>
+
+          <section className="content-section" id="about">
+            <div className="section-heading"><span>01</span><h2>{renderInlineMarkdown(aboutHeading)}</h2></div>
+            {aboutContent.blocks.map((block, index) => {
+              if (block.type === 'list') {
+                return <ul className="about-list" key={`list-${index}`}>{block.items.map((item, itemIndex) => <li key={itemIndex}>{renderInlineMarkdown(item)}</li>)}</ul>
+              }
+              if (block.type === 'heading') {
+                return <h3 className="about-subheading" key={`heading-${index}`}>{renderInlineMarkdown(block.text)}</h3>
+              }
+              return <p className="section-copy" key={`paragraph-${index}`}>{renderInlineMarkdown(block.text)}</p>
+            })}
+          </section>
+
+          <section className="content-section" id="skills">
+            <div className="section-heading"><span>02</span><h2>{settings.skills_heading}</h2></div>
+            {skills.length ? (
+              <div className="skill-groups">
+                {groupSkillsByCategory(skills).map((group, groupIndex) => (
+                  <div className="skill-list" key={`${group.category}-${groupIndex}`}>
+                    {group.skills.map((skill) => <SkillBadge key={skill.id} skill={skill} />)}
+                  </div>
+                ))}
+              </div>
+            ) : <p className="empty-copy">Skills will be added soon.</p>}
+          </section>
+
+          <section className="content-section" id="experience">
+            <div className="section-heading"><span>03</span><h2>{settings.education_heading}</h2></div>
+            {education.length ? (
+              <div className="education-list">
+                {education.map((item) => (
+                  <article className="education-item" key={item.id}>
+                    <span className="education-period">{item.period}</span>
+                    <div><h3>{item.qualification}</h3><p className="education-institution">{item.institution}</p><p>{item.description}</p></div>
+                  </article>
+                ))}
+              </div>
+            ) : <p className="empty-copy">Education details will be added soon.</p>}
+          </section>
+
+          <section className="content-section work-section" id="work">
+            <div className="section-heading"><span>04</span><h2>{settings.projects_heading}</h2></div>
+            {projects.length ? (
+              <div className="project-grid">
+                {projects.map((project) => (
+                  <article className="project-card" key={project.id}>
+                    {project.image_url
+                      ? <img className="project-image" src={project.image_url} alt="" loading="lazy" />
+                      : <div className="project-image project-image-placeholder" aria-hidden="true">Portfolio</div>}
+                    <div className="project-meta"><span>{project.featured ? 'Featured project' : 'Project'}</span><span>{String(project.sort_order).padStart(2, '0')}</span></div>
+                    <h3>{project.title}</h3>
+                    <p className="project-description">{project.description}</p>
+                    {project.technologies?.length > 0 && (
+                      <ul className="technology-list">{project.technologies.map((technology) => <li key={technology}>{technology}</li>)}</ul>
+                    )}
+                    {project.project_url && <a className="project-link" href={project.project_url} target="_blank" rel="noreferrer">View project <span aria-hidden="true">↗</span></a>}
+                  </article>
+                ))}
+              </div>
+            ) : <p className="empty-copy">Projects will be added soon.</p>}
+          </section>
+
+          <section className="content-section inquiry-section" id="ask">
+            <div className="section-heading"><span>05</span><h2>Ask a question</h2></div>
+            <p className="section-copy">Send a question and check back here for a reply. Conversations are private to your ticket and automatically deleted after 7 days.</p>
+            <div className="inquiry-panel">
+              {inquiryLoading && !inquiry ? (
+                <p className="inquiry-status">Loading your private question ticket…</p>
+              ) : inquiry ? (
+                <div className="inquiry-thread">
+                  <div className="inquiry-thread-heading">
+                    <div><strong>Conversation</strong><span>Replies are checked automatically every 30 seconds.</span></div>
+                    <small>Expires {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(inquiry.expires_at))}</small>
+                  </div>
+                  <div className="inquiry-messages" aria-live="polite">
+                    {inquiry.messages.map((message) => (
+                      <article className={`inquiry-message ${message.sender}`} key={message.id}>
+                        <div className="inquiry-message-meta">
+                          <strong>{message.sender === 'admin' ? profile.full_name : 'You'}</strong>
+                          <time dateTime={message.created_at}>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(message.created_at))}</time>
+                        </div>
+                        <p>{message.body}</p>
+                      </article>
+                    ))}
+                  </div>
+                  <div className="inquiry-ticket">
+                    <div><span>Private ticket</span><code>{ticketToken}</code></div>
+                    <button className="ticket-button" type="button" onClick={copyTicket}>Copy</button>
+                    <button className="ticket-button" type="button" onClick={startNewQuestion}>Ask another</button>
+                  </div>
+                </div>
+              ) : (
+                <form className="inquiry-form" onSubmit={sendQuestion}>
+                  {inquiryNotice && <p className="inquiry-status" role="status">{inquiryNotice}</p>}
+                  {inquiryError && <p className="inquiry-error" role="alert">{inquiryError}</p>}
+                  <div className="inquiry-fields">
+                    <label>Name
+                      <input type="text" autoComplete="name" maxLength={80} value={questionName} onChange={(event) => setQuestionName(event.target.value)} required />
+                    </label>
+                    <label>Email
+                      <input type="email" autoComplete="email" maxLength={254} value={questionEmail} onChange={(event) => setQuestionEmail(event.target.value)} required />
+                    </label>
+                    <label className="inquiry-question">Your question
+                      <textarea rows={5} maxLength={4000} value={questionBody} onChange={(event) => setQuestionBody(event.target.value)} required />
+                    </label>
+                  </div>
+                  <div className="inquiry-lookup">
+                    <label htmlFor="ticket-lookup">Already have a private ticket?</label>
+                    <div>
+                      <input id="ticket-lookup" type="text" autoComplete="off" maxLength={43} value={ticketLookup} onChange={(event) => setTicketLookup(event.target.value)} placeholder="Paste your 43-character ticket" />
+                      <button className="ticket-button" type="button" onClick={openTicket} disabled={inquiryLoading}>Open ticket</button>
+                    </div>
+                  </div>
+                  <div className="inquiry-form-footer">
+                    <p>Your reply appears in this conversation; no email notification is sent. Save the private ticket to check from another browser.</p>
+                    <button className="inquiry-submit" type="submit" disabled={inquiryBusy}>{inquiryBusy ? 'Sending…' : 'Send question'} <span aria-hidden="true">↗</span></button>
+                  </div>
+                </form>
+              )}
+              {inquiryError && inquiry && <p className="inquiry-error" role="alert">{inquiryError}</p>}
+              {inquiryNotice && inquiry && <p className="inquiry-status" role="status">{inquiryNotice}</p>}
+            </div>
+          </section>
+
+          <footer className="site-footer">
+            <span>© {new Date().getFullYear()} {profile.full_name}</span>
+            <a href="/admin">Manage portfolio <span aria-hidden="true">↗</span></a>
+          </footer>
+        </div>
+      </div>
+    </main>
+  )
+}
+
+export default function App() {
+  return window.location.pathname.replace(/\/+$/, '') === '/admin'
+    ? <Admin />
+    : <PortfolioSite />
+}

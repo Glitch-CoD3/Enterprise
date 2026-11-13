@@ -1,6 +1,5 @@
 import React from 'react'
 import './Card.css'
-import { space } from 'postcss/lib/list'
 
 const Card = (props) => {
   return (
