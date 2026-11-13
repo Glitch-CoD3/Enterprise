@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+#about {
+    @apply my-4 font-sans text-[#a0a0a0] mb-8;
+}
+
+.heading {
+    @apply text-2xl font-semibold text-[#e0e0e0];
+}
+
+.line {
+    @apply mt-3 mb-1 w-16 h-1 bg-[#F5F935] ;
+}
+
+
+
+#about p {
+    @apply text-justify mt-2 hover:text-white transition-colors  duration-700 ease-in-out;
+}
