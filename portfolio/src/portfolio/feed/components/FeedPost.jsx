@@ -18,13 +18,13 @@ export default function FeedPost({ post, name, avatarUrl, isAdmin, busy, onDelet
       <div className="flex items-center gap-[9px]">
         <FeedAvatar name={name} imageUrl={avatarUrl} />
         <div className="grid min-w-0 flex-1 gap-1">
-          <strong className="text-[10px]">{name}</strong>
-          <time className="text-[8px] text-[#859188]" dateTime={post.created_at}>{formatDate(post.created_at)}</time>
+          <strong className="text-xs">{name}</strong>
+          <time className="text-[10px] text-[#859188]" dateTime={post.created_at}>{formatDate(post.created_at)}</time>
         </div>
-        <span className={`rounded-full px-2 py-[5px] text-[8px] font-semibold ${categoryStyles[post.category] || 'bg-[#202a41] text-[#c3cee6]'}`}>{categoryLabels[post.category] || 'Post'}</span>
+        <span className={`rounded-full px-2.5 py-[5px] text-[10px] font-semibold ${categoryStyles[post.category] || 'bg-[#202a41] text-[#c3cee6]'}`}>{categoryLabels[post.category] || 'Post'}</span>
       </div>
-      <h3 className="mb-[7px] mt-[15px] font-[Manrope] text-base font-bold leading-[1.45] tracking-[-.025em]">{post.title}</h3>
-      <p className="m-0 break-words whitespace-pre-wrap text-[11px] leading-[1.8] text-[#c0cbc1]">{post.body}</p>
+      <h3 className="mb-2 mt-4 font-[Manrope] text-[19px] font-bold leading-[1.45] tracking-[-.025em]">{post.title}</h3>
+      <p className="m-0 break-words whitespace-pre-wrap text-sm leading-[1.8] text-[#c0cbc1]">{post.body}</p>
       {imageUrl && <img className="mt-[14px] max-h-[360px] w-full rounded-[9px] border border-[#344139] bg-[#111613] object-contain" src={imageUrl} alt={post.title} loading="lazy" />}
       {video?.kind === 'file' && <video className="mt-[14px] max-h-[360px] w-full rounded-[9px] border border-[#344139] bg-[#111613] object-contain" src={video.src} controls preload="metadata" />}
       {video?.kind === 'embed' && (
@@ -38,9 +38,9 @@ export default function FeedPost({ post, name, avatarUrl, isAdmin, busy, onDelet
           <span className="grid gap-1 text-[11px] font-bold">Watch this clip<small className="text-[8px] font-normal text-[#c3cee6]">Opens in a new tab ↗</small></span>
         </a>
       )}
-      <div className="mt-[13px] flex items-center justify-between gap-3 border-t border-[#2b3730] pt-[11px] text-[8px] text-[#859188]">
+      <div className="mt-[13px] flex items-center justify-between gap-3 border-t border-[#2b3730] pt-[11px] text-[10px] text-[#859188]">
         <span><i className="mr-1 not-italic text-[#9ab2ff]" aria-hidden="true">✳</i> Shared from the learning journal</span>
-        {isAdmin && <button className="rounded border border-[#4c3531] bg-transparent px-2 py-[5px] text-[8px] text-[#e7a39a] disabled:cursor-wait disabled:opacity-50" type="button" onClick={() => onDelete(post)} disabled={busy}>Delete</button>}
+        {isAdmin && <button className="rounded border border-[#4c3531] bg-transparent px-2 py-[5px] text-[10px] text-[#e7a39a] disabled:cursor-wait disabled:opacity-50" type="button" onClick={() => onDelete(post)} disabled={busy}>Delete</button>}
       </div>
     </article>
   )

@@ -33,6 +33,9 @@ services:
 
     container_name: myapp-portfolio
 
+    expose:
+      - "80"
+
     restart: unless-stopped
 
   nginx:

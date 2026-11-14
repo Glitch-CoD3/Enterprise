@@ -56,12 +56,12 @@ export default function FeedPage() {
               onMediaFileChange={feed.selectMediaFile}
             />
           ) : (
-            <FeedSignInPrompt sessionReady={feed.sessionReady} adminError={feed.adminError} />
+            <FeedSignInPrompt />
           )}
           <FeedResultsHeading filter={feed.filter} count={feed.filteredPosts.length} loading={feed.loading} />
           <FeedPageError message={feed.pageError} />
           {feed.loading && (
-            <div className="flex items-center justify-center gap-2.5 py-[38px] text-[10px] text-[#a9b5ac]">
+            <div className="flex items-center justify-center gap-2.5 py-[38px] text-xs text-[#a9b5ac]">
               <span className="h-[17px] w-[17px] animate-spin rounded-full border-2 border-white/15 border-t-[#9ab2ff]" />
               Loading the feed…
             </div>
@@ -84,7 +84,7 @@ export default function FeedPage() {
           )}
         </section>
       </div>
-      <footer className="mx-auto flex max-w-[980px] justify-between border-t border-[#2b3730] py-[19px] pr-4 text-[9px] text-[#859188]">
+      <footer className="mx-auto flex max-w-[980px] justify-between border-t border-[#2b3730] py-[19px] pr-4 text-[11px] text-[#859188]">
         <span>© {new Date().getFullYear()} {name}</span>
         <a className="text-[#a9b5ac] transition-colors hover:text-[#c1d0ff]" href={sitePath()}>Explore the portfolio <span className="ml-1">↗</span></a>
       </footer>

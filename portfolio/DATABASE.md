@@ -46,4 +46,4 @@ Manage the public technology gallery from **Admin → Skills & tools**. Add one 
 
 ## Docker Compose subpath
 
-The root `docker-compose.yml` serves the portfolio at `/portfolio/` through Nginx, with the admin panel at `/portfolio/admin`. Configure Supabase in `portfolio/.env`, then run `docker compose up --build`. Vite uses the same `/portfolio/` base for assets and in-app navigation; local development outside Compose keeps the default `/` base.
+The root `docker-compose.yml` serves a Vite production build as static files through Nginx at `/portfolio/`, with the admin panel at `/portfolio/admin`. Configure Supabase in `portfolio/.env`, then run `docker compose up --build`. The Nginx container injects the public Supabase URL and publishable key at startup, so the build stays reusable and page loads do not start a development server. Vite uses the same `/portfolio/` base for assets and in-app navigation; local development outside Compose keeps the default `/` base.
