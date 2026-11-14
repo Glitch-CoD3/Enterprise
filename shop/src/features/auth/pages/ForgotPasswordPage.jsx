@@ -18,7 +18,7 @@ export default function ForgotPasswordPage() {
       const client = await requireSupabase()
       const { error: resetError } = await client.auth.resetPasswordForEmail(
         email.trim(),
-        { redirectTo: `${window.location.origin}/reset-password` },
+        { redirectTo: `${window.location.origin}/store/reset-password` }
       )
       if (resetError) throw resetError
       setMessage('If there’s an account for this email, a reset link is on its way.')
