@@ -1,4 +1,5 @@
 import '../App.css'
+import SiteNavigation from '../components/SiteNavigation.jsx'
 import InlineMarkdown from './components/InlineMarkdown.jsx'
 import SkillBadge from './components/SkillBadge.jsx'
 import { getWhatsAppUrl, groupSkillsByCategory, parseAboutContent } from './content.js'
@@ -74,14 +75,14 @@ function PortfolioSite() {
     <main className="portfolio-page" style={pageStyle}>
       <header className="site-header">
         <a className="wordmark" href="#home" aria-label="Home">{settings.site_title || profile.full_name}</a>
-        <nav className="site-nav" aria-label="Main navigation">
-          <a href="#about">{aboutHeading}</a>
-          <a href="#skills">{settings.skills_heading}</a>
-          <a href="#experience">{settings.education_heading}</a>
-          <a href="#work">{settings.projects_heading}</a>
-          <a className="feed-nav-link" href={sitePath('feed')}>Feed</a>
-          <a href="#ask">Ask a question</a>
-        </nav>
+        <SiteNavigation links={[
+          { label: aboutHeading, href: '#about' },
+          { label: settings.skills_heading, href: '#skills' },
+          { label: settings.education_heading, href: '#experience' },
+          { label: settings.projects_heading, href: '#work' },
+          { label: 'Feed', href: sitePath('feed'), className: 'feed-nav-link' },
+          { label: 'Ask a question', href: '#ask' },
+        ]} />
         <a
           className="header-contact"
           href={whatsappUrl || `mailto:${profile.email}`}

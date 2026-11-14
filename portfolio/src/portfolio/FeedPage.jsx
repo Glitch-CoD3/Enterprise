@@ -27,7 +27,7 @@ export default function FeedPage() {
     <main className="min-h-screen bg-[#111613] px-[clamp(20px,6vw,92px)] text-[#edf2ed] [background-image:radial-gradient(ellipse_at_86%_0%,rgba(63,101,209,0.16),transparent_30%)] [font-family:'DM_Sans',sans-serif] max-[680px]:px-[22px] max-[430px]:px-[17px]" style={pageStyle}>
       <FeedHeader name={name} />
       <FeedIntro />
-      <div className="mx-auto grid max-w-[980px] grid-cols-[minmax(280px,320px)_minmax(0,560px)] items-start justify-center gap-[clamp(28px,3vw,40px)] pb-[65px] pr-4 pt-[37px] max-[900px]:grid-cols-[260px_minmax(0,1fr)] max-[900px]:gap-6 max-[680px]:grid-cols-1 max-[680px]:gap-[15px] max-[680px]:pb-[42px] max-[680px]:pt-6">
+      <div className="mx-auto grid max-w-[980px] grid-cols-[minmax(280px,320px)_minmax(0,560px)] items-start justify-center gap-[clamp(28px,3vw,40px)] pb-[65px] pr-4 pt-[37px] max-[900px]:grid-cols-[260px_minmax(0,1fr)] max-[900px]:gap-6 max-[680px]:grid-cols-1 max-[680px]:gap-[15px] max-[680px]:pb-[42px] max-[680px]:pr-0 max-[680px]:pt-6">
         <FeedSidebar name={name} avatarUrl={avatarUrl} />
         <section className="min-w-0 scroll-mt-[105px]" id="journal" aria-label="Posts">
           <FeedCategoryTabs filter={feed.filter} onChange={feed.setFilter} postCount={feed.posts.length} />

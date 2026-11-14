@@ -16,8 +16,9 @@ FROM nginx:alpine
 
 COPY --from=build /app/dist /usr/share/nginx/html/portfolio
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY docker-entrypoint.sh /docker-entrypoint.sh
+COPY portfolio-entrypoint.sh /portfolio-entrypoint.sh
+RUN sed -i 's/\r$//' /portfolio-entrypoint.sh
 
 EXPOSE 80
 
-CMD ["sh", "/docker-entrypoint.sh"]
+CMD ["sh", "/portfolio-entrypoint.sh"]
