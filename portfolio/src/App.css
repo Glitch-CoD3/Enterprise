@@ -35,6 +35,12 @@
 .site-nav a { position: relative; padding: 8px 0; }
 .site-nav a::after { position: absolute; right: 0; bottom: 1px; left: 0; height: 1px; background: var(--accent); content: ""; transform: scaleX(0); transform-origin: left; transition: transform .2s ease; }
 .site-nav a:hover { color: var(--ink); }
+.site-nav a.feed-nav-link { color: #bbf17c; }
+.site-nav a.feed-nav-link:hover { color: #d3f8a7; }
+.site-nav a.feed-nav-link::after { background: #bbf17c; }
+.site-nav a[aria-current="page"] { color: var(--ink); }
+.site-nav a.feed-nav-link[aria-current="page"] { color: #bbf17c; }
+.site-nav a[aria-current="page"]::after { transform: scaleX(1); }
 .site-nav a:hover::after { transform: scaleX(1); }
 .header-contact:focus-visible, .ticket-button:focus-visible, .inquiry-submit:focus-visible { outline: 3px solid rgba(154, 178, 255, .55); outline-offset: 3px; }
 .header-contact { padding: 11px 15px; border: 1px solid var(--accent); border-radius: 999px; color: #fff; background: var(--accent); font-size: 12px; font-weight: 700; }
@@ -195,7 +201,7 @@
   .site-header { height: auto; min-height: 68px; flex-wrap: wrap; gap: 0; padding-top: 12px; }
   .wordmark { order: 1; }
   .header-contact { order: 2; padding: 9px 12px; }
-  .site-nav { order: 4; display: flex; width: 100%; justify-content: space-between; gap: 8px; margin-top: 11px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 10px; }
+  .site-nav { order: 4; display: flex; width: 100%; justify-content: flex-start; gap: 16px; overflow-x: auto; margin-top: 11px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 10px; white-space: nowrap; }
   .site-nav a { padding: 4px 0; }
   .portfolio-layout { display: flex; flex-direction: column; gap: 0; }
   .profile-panel { position: static; display: grid; grid-template-columns: 100px minmax(0, 1fr); column-gap: 16px; margin-top: 20px; padding: 18px; }

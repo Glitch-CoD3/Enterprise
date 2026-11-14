@@ -79,6 +79,7 @@ function PortfolioSite() {
           <a href="#skills">{settings.skills_heading}</a>
           <a href="#experience">{settings.education_heading}</a>
           <a href="#work">{settings.projects_heading}</a>
+          <a className="feed-nav-link" href={sitePath('feed')}>Feed</a>
           <a href="#ask">Ask a question</a>
         </nav>
         <a
