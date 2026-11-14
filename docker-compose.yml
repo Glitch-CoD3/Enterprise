@@ -18,6 +18,23 @@ services:
 
     restart: unless-stopped
 
+  portfolio:
+    build:
+      context: ./portfolio
+      dockerfile: Dockerfile
+      args:
+        PORTFOLIO_BASE_PATH: /portfolio/
+
+    env_file:
+      - ./portfolio/.env
+
+    environment:
+      PORTFOLIO_BASE_PATH: /portfolio/
+
+    container_name: myapp-portfolio
+
+    restart: unless-stopped
+
   nginx:
     image: nginx:alpine
 
@@ -31,5 +48,6 @@ services:
 
     depends_on:
       - shop
+      - portfolio
 
     restart: unless-stopped

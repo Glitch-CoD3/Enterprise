@@ -43,3 +43,7 @@ The public “Let's talk” button opens WhatsApp using the phone number in **Ad
 Only a Supabase publishable key belongs in frontend configuration. Supabase Auth passwords and admin membership are managed in Supabase; do not add a service-role key to this app.
 
 Manage the public technology gallery from **Admin → Skills & tools**. Add one item per technology, paste a direct public icon URL or a Shields.io badge URL/Markdown image, set its category and display order, and mark it visible. Shields.io badges display at full size; regular icon URLs display beside the technology name. The gallery uses the existing `portfolio_skills.icon_url` column; the latest migration updates its content without changing the table schema.
+
+## Docker Compose subpath
+
+The root `docker-compose.yml` serves the portfolio at `/portfolio/` through Nginx, with the admin panel at `/portfolio/admin`. Configure Supabase in `portfolio/.env`, then run `docker compose up --build`. Vite uses the same `/portfolio/` base for assets and in-app navigation; local development outside Compose keeps the default `/` base.
